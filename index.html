@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>스마트 가계부</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <i class="fas fa-wallet"></i>
+                <span>스마트 가계부</span>
+            </div>
+            <button class="sidebar-close" id="sidebarClose"><i class="fas fa-times"></i></button>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item active" data-tab="dashboard">
+                <i class="fas fa-tachometer-alt"></i><span>대시보드</span>
+            </a>
+            <a href="#" class="nav-item" data-tab="add">
+                <i class="fas fa-plus-circle"></i><span>내역 입력</span>
+            </a>
+            <a href="#" class="nav-item" data-tab="list">
+                <i class="fas fa-list-alt"></i><span>내역 목록</span>
+            </a>
+            <a href="#" class="nav-item" data-tab="stats">
+                <i class="fas fa-chart-pie"></i><span>통계</span>
+            </a>
+            <a href="#" class="nav-item" data-tab="budget">
+                <i class="fas fa-bullseye"></i><span>예산 관리</span>
+            </a>
+            <a href="#" class="nav-item" data-tab="recurring">
+                <i class="fas fa-sync-alt"></i><span>반복 거래</span>
+            </a>
+            <div class="nav-divider"></div>
+            <a href="#" class="nav-item" data-tab="admin">
+                <i class="fas fa-cog"></i><span>분류 관리</span>
+            </a>
+            <a href="#" class="nav-item" data-tab="data">
+                <i class="fas fa-database"></i><span>데이터 관리</span>
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <button class="theme-toggle" id="themeToggle">
+                <i class="fas fa-moon"></i><span>다크 모드</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Top Bar -->
+        <header class="topbar">
+            <button class="hamburger" id="hamburger"><i class="fas fa-bars"></i></button>
+            <h1 class="page-title" id="pageTitle">대시보드</h1>
+            <div class="topbar-actions">
+                <button class="btn btn-primary btn-sm" id="quickAddBtn">
+                    <i class="fas fa-plus"></i><span>빠른 입력</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Tab Contents -->
+        <div class="content-area">
+            <!-- Dashboard -->
+            <section class="tab-content active" id="tab-dashboard">
+                <div class="dashboard-grid">
+                    <div class="stat-card income">
+                        <div class="stat-icon"><i class="fas fa-arrow-down"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">이번 달 수입</span>
+                            <span class="stat-value" id="dashIncome">0</span>
+                        </div>
+                    </div>
+                    <div class="stat-card expense">
+                        <div class="stat-icon"><i class="fas fa-arrow-up"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">이번 달 지출</span>
+                            <span class="stat-value" id="dashExpense">0</span>
+                        </div>
+                    </div>
+                    <div class="stat-card balance">
+                        <div class="stat-icon"><i class="fas fa-balance-scale"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">잔액</span>
+                            <span class="stat-value" id="dashBalance">0</span>
+                        </div>
+                    </div>
+                    <div class="stat-card budget-card">
+                        <div class="stat-icon"><i class="fas fa-bullseye"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">예산 사용률</span>
+                            <span class="stat-value" id="dashBudget">-</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="dashboard-charts">
+                    <div class="chart-card">
+                        <h3>분류별 지출 현황</h3>
+                        <div class="chart-container" style="height:320px;">
+                            <canvas id="dashDonutChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>최근 6개월 추이</h3>
+                        <div class="chart-container" style="height:320px;">
+                            <canvas id="dashTrendChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="chart-card recent-transactions">
+                    <h3>최근 거래 내역</h3>
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>날짜</th><th>분류</th><th>사용처</th><th>금액</th><th>결제수단</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dashRecentList"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Add Transaction -->
+            <section class="tab-content" id="tab-add">
+                <div class="form-card">
+                    <h2><i class="fas fa-plus-circle"></i> 내역 입력</h2>
+                    <form id="transactionForm">
+                        <input type="hidden" id="editId" value="">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>날짜 <span class="required">*</span></label>
+                                <input type="date" id="txDate" required>
+                            </div>
+                            <div class="form-group">
+                                <label>대분류 <span class="required">*</span></label>
+                                <div class="type-toggle">
+                                    <button type="button" class="type-btn active" data-type="expense">
+                                        <i class="fas fa-minus-circle"></i> 지출
+                                    </button>
+                                    <button type="button" class="type-btn" data-type="income">
+                                        <i class="fas fa-plus-circle"></i> 수입
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>세부내용(사용처) <span class="required">*</span></label>
+                                <input type="text" id="txDescription" placeholder="예: 스타벅스 아메리카노" required autocomplete="off">
+                                <small class="auto-classify-hint" id="autoClassifyHint" style="display:none;">
+                                    <i class="fas fa-magic"></i> 자동분류: <span id="autoClassifyResult"></span>
+                                </small>
+                            </div>
+                            <div class="form-group">
+                                <label>중분류 <span class="required">*</span></label>
+                                <select id="txCategory" required>
+                                    <option value="">선택하세요</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>금액 <span class="required">*</span></label>
+                                <div class="input-with-unit">
+                                    <input type="text" id="txAmount" placeholder="0" required inputmode="numeric">
+                                    <span class="unit">원</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>결제수단 <span class="required">*</span></label>
+                                <select id="txPayment" required>
+                                    <option value="card">카드</option>
+                                    <option value="cash">현금</option>
+                                    <option value="transfer">이체</option>
+                                    <option value="etc">기타</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>메모</label>
+                            <textarea id="txMemo" rows="2" placeholder="메모 (선택사항)"></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-secondary" id="txReset">초기화</button>
+                            <button type="submit" class="btn btn-primary" id="txSubmitBtn">
+                                <i class="fas fa-save"></i> 저장
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Transaction List -->
+            <section class="tab-content" id="tab-list">
+                <div class="form-card search-card">
+                    <h3><i class="fas fa-search"></i> 검색 조건</h3>
+                    <div class="search-grid">
+                        <div class="form-group">
+                            <label>기간</label>
+                            <div class="date-range">
+                                <input type="date" id="searchDateFrom">
+                                <span>~</span>
+                                <input type="date" id="searchDateTo">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>대분류</label>
+                            <select id="searchType">
+                                <option value="">전체</option>
+                                <option value="expense">지출</option>
+                                <option value="income">수입</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>중분류</label>
+                            <select id="searchCategory">
+                                <option value="">전체</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>키워드</label>
+                            <input type="text" id="searchKeyword" placeholder="사용처, 메모 검색">
+                        </div>
+                        <div class="form-group">
+                            <label>금액 범위</label>
+                            <div class="date-range">
+                                <input type="text" id="searchAmountMin" placeholder="최소" inputmode="numeric">
+                                <span>~</span>
+                                <input type="text" id="searchAmountMax" placeholder="최대" inputmode="numeric">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>결제수단</label>
+                            <select id="searchPayment">
+                                <option value="">전체</option>
+                                <option value="card">카드</option>
+                                <option value="cash">현금</option>
+                                <option value="transfer">이체</option>
+                                <option value="etc">기타</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="search-actions">
+                        <button class="btn btn-secondary" id="searchReset">초기화</button>
+                        <button class="btn btn-primary" id="searchBtn"><i class="fas fa-search"></i> 검색</button>
+                        <button class="btn btn-success" id="excelDownload"><i class="fas fa-file-excel"></i> 엑셀 다운로드</button>
+                    </div>
+                </div>
+                <div class="form-card">
+                    <div class="list-header">
+                        <h3 id="listTitle">내역 목록</h3>
+                        <div class="list-summary">
+                            <span>총 <strong id="listTotal">0</strong>건</span>
+                            <span class="sep">|</span>
+                            <span>수입 <strong id="listIncomeSum" class="text-income">0</strong></span>
+                            <span class="sep">|</span>
+                            <span>지출 <strong id="listExpenseSum" class="text-expense">0</strong></span>
+                        </div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="data-table" id="txTable">
+                            <thead>
+                                <tr>
+                                    <th class="sortable" data-sort="date">날짜 <i class="fas fa-sort"></i></th>
+                                    <th>분류</th>
+                                    <th>사용처</th>
+                                    <th class="sortable" data-sort="amount">금액 <i class="fas fa-sort"></i></th>
+                                    <th>결제수단</th>
+                                    <th>메모</th>
+                                    <th>관리</th>
+                                </tr>
+                            </thead>
+                            <tbody id="txListBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="pagination" id="txPagination"></div>
+                </div>
+            </section>
+
+            <!-- Statistics -->
+            <section class="tab-content" id="tab-stats">
+                <div class="form-card">
+                    <div class="stats-header">
+                        <h3><i class="fas fa-chart-pie"></i> 통계</h3>
+                        <div class="stats-controls">
+                            <select id="statsYear"></select>
+                            <select id="statsMonth">
+                                <option value="">연간</option>
+                            </select>
+                            <div class="type-toggle">
+                                <button type="button" class="type-btn active" data-stats-type="expense">지출</button>
+                                <button type="button" class="type-btn" data-stats-type="income">수입</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="dashboard-charts">
+                    <div class="chart-card">
+                        <h3 id="statsPieTitle">분류별 비중</h3>
+                        <div class="chart-container" style="height:360px;">
+                            <canvas id="statsPieChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3 id="statsBarTitle">분류별 금액</h3>
+                        <div class="chart-container" style="height:360px;">
+                            <canvas id="statsBarChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="dashboard-charts">
+                    <div class="chart-card">
+                        <h3>월별 추이</h3>
+                        <div class="chart-container" style="height:360px;">
+                            <canvas id="statsTrendChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>수입 vs 지출 잔액 흐름</h3>
+                        <div class="chart-container" style="height:360px;">
+                            <canvas id="statsFlowChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-card">
+                    <h3><i class="fas fa-exchange-alt"></i> 전월 / 전년 동기 비교</h3>
+                    <div class="comparison-grid" id="comparisonGrid"></div>
+                </div>
+            </section>
+
+            <!-- Budget -->
+            <section class="tab-content" id="tab-budget">
+                <div class="form-card">
+                    <div class="stats-header">
+                        <h3><i class="fas fa-bullseye"></i> 예산 관리</h3>
+                        <div class="stats-controls">
+                            <select id="budgetYear"></select>
+                            <select id="budgetMonth"></select>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-card">
+                    <h3>총 예산 설정</h3>
+                    <div class="budget-total-row">
+                        <div class="input-with-unit">
+                            <input type="text" id="budgetTotalAmount" placeholder="월 총 예산" inputmode="numeric">
+                            <span class="unit">원</span>
+                        </div>
+                        <button class="btn btn-primary" id="saveTotalBudget"><i class="fas fa-save"></i> 저장</button>
+                    </div>
+                    <div class="budget-progress-area" id="budgetTotalProgress"></div>
+                </div>
+                <div class="form-card">
+                    <div class="list-header">
+                        <h3>중분류별 예산</h3>
+                        <button class="btn btn-primary btn-sm" id="addCategoryBudget">
+                            <i class="fas fa-plus"></i> 추가
+                        </button>
+                    </div>
+                    <div id="categoryBudgetList"></div>
+                </div>
+            </section>
+
+            <!-- Recurring -->
+            <section class="tab-content" id="tab-recurring">
+                <div class="form-card">
+                    <div class="list-header">
+                        <h3><i class="fas fa-sync-alt"></i> 반복 거래</h3>
+                        <button class="btn btn-primary btn-sm" id="addRecurring">
+                            <i class="fas fa-plus"></i> 반복 거래 등록
+                        </button>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>구분</th><th>분류</th><th>사용처</th><th>금액</th><th>결제수단</th><th>매월</th><th>상태</th><th>관리</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recurringList"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Admin -->
+            <section class="tab-content" id="tab-admin">
+                <div class="form-card">
+                    <div class="list-header">
+                        <h3><i class="fas fa-cog"></i> 분류 관리</h3>
+                        <div class="stats-controls">
+                            <div class="type-toggle">
+                                <button type="button" class="type-btn active" data-admin-type="expense">지출</button>
+                                <button type="button" class="type-btn" data-admin-type="income">수입</button>
+                            </div>
+                            <button class="btn btn-primary btn-sm" id="addCategory">
+                                <i class="fas fa-plus"></i> 분류 추가
+                            </button>
+                        </div>
+                    </div>
+                    <div id="categoryAdminList"></div>
+                </div>
+            </section>
+
+            <!-- Data Management -->
+            <section class="tab-content" id="tab-data">
+                <div class="data-mgmt-grid">
+                    <div class="form-card">
+                        <h3><i class="fas fa-file-import"></i> 데이터 가져오기</h3>
+                        <p class="hint">엑셀(.xlsx) 또는 CSV(.csv) 파일을 가져옵니다.</p>
+                        <div class="import-area" id="importDropZone">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>파일을 드래그하거나 클릭하여 선택</p>
+                            <input type="file" id="importFile" accept=".xlsx,.csv" hidden>
+                        </div>
+                        <div id="importPreview" style="display:none;"></div>
+                    </div>
+                    <div class="form-card">
+                        <h3><i class="fas fa-download"></i> 데이터 백업</h3>
+                        <p class="hint">모든 데이터를 JSON 파일로 백업합니다.</p>
+                        <button class="btn btn-primary" id="backupBtn"><i class="fas fa-download"></i> 백업 다운로드</button>
+                    </div>
+                    <div class="form-card">
+                        <h3><i class="fas fa-upload"></i> 데이터 복원</h3>
+                        <p class="hint">백업 JSON 파일로 데이터를 복원합니다.</p>
+                        <div class="import-area" id="restoreDropZone">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>백업 파일을 드래그하거나 클릭하여 선택</p>
+                            <input type="file" id="restoreFile" accept=".json" hidden>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Modals -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal" id="modal">
+            <div class="modal-header">
+                <h3 id="modalTitle">모달</h3>
+                <button class="modal-close" id="modalClose"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+            <div class="modal-footer" id="modalFooter"></div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
