@@ -61,59 +61,122 @@ const Utils = {
     }
 };
 
-// ===== API Layer =====
-const API = {
-    async get(table, params = {}) {
+// ===== Default Categories =====
+const DEFAULT_CATEGORIES = [
+    {id:"cat_exp_food",type:"expense",name:"식비",keywords:["식당","마트","편의점","배달","치킨","피자","카페","커피","스타벅스","맥도날드","버거킹","김밥","떡볶이","배민","요기요","쿠팡이츠"],sort_order:1,is_default:true,deleted:false},
+    {id:"cat_exp_transport",type:"expense",name:"교통",keywords:["택시","버스","지하철","주유","주차","톨게이트","KTX","고속버스","카카오택시","티머니"],sort_order:2,is_default:true,deleted:false},
+    {id:"cat_exp_housing",type:"expense",name:"주거/통신",keywords:["월세","관리비","전기","가스","수도","인터넷","통신","SKT","KT","LG","넷플릭스","유튜브"],sort_order:3,is_default:true,deleted:false},
+    {id:"cat_exp_medical",type:"expense",name:"의료/건강",keywords:["병원","약국","치과","안과","피부과","한의원","건강검진","약","헬스","PT","운동"],sort_order:4,is_default:true,deleted:false},
+    {id:"cat_exp_shopping",type:"expense",name:"쇼핑",keywords:["옷","신발","가방","쿠팡","네이버쇼핑","11번가","G마켓","무신사","올리브영","다이소","백화점"],sort_order:5,is_default:true,deleted:false},
+    {id:"cat_exp_culture",type:"expense",name:"문화/여가",keywords:["영화","공연","여행","호텔","숙소","에어비앤비","게임","도서","책"],sort_order:6,is_default:true,deleted:false},
+    {id:"cat_exp_education",type:"expense",name:"교육",keywords:["학원","학비","수업료","인강","강의","교재","시험"],sort_order:7,is_default:true,deleted:false},
+    {id:"cat_exp_insurance",type:"expense",name:"보험/세금",keywords:["보험","세금","국민연금","건강보험","자동차보험","재산세","소득세"],sort_order:8,is_default:true,deleted:false},
+    {id:"cat_exp_other",type:"expense",name:"기타지출",keywords:[],sort_order:99,is_default:true,deleted:false},
+    {id:"cat_inc_salary",type:"income",name:"급여",keywords:["급여","월급","연봉","보너스","상여금","성과급"],sort_order:1,is_default:true,deleted:false},
+    {id:"cat_inc_side",type:"income",name:"부수입",keywords:["프리랜서","알바","부업","아르바이트","외주"],sort_order:2,is_default:true,deleted:false},
+    {id:"cat_inc_invest",type:"income",name:"투자수익",keywords:["이자","배당","주식","펀드","적금","예금"],sort_order:3,is_default:true,deleted:false},
+    {id:"cat_inc_other",type:"income",name:"기타수입",keywords:["용돈","환급","캐시백","포인트"],sort_order:4,is_default:true,deleted:false}
+];
+
+// ===== localStorage Storage Layer =====
+const Store = {
+    _getTable(table) {
         try {
-            const q = new URLSearchParams({ limit: '10000', ...params }).toString();
-            const r = await fetch(`tables/${table}?${q}`);
-            if (!r.ok) return [];
-            const json = await r.json();
-            return Array.isArray(json) ? json : (json.data || []);
+            const raw = localStorage.getItem(`smartbook_${table}`);
+            return raw ? JSON.parse(raw) : null;
         } catch(e) {
-            console.warn(`API get ${table} failed:`, e);
-            return [];
+            return null;
         }
     },
-    async create(table, data) {
-        const r = await fetch(`tables/${table}`, {
-            method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify(data)
-        });
-        return await r.json();
+    _setTable(table, data) {
+        localStorage.setItem(`smartbook_${table}`, JSON.stringify(data));
     },
-    async update(table, id, data) {
-        const r = await fetch(`tables/${table}/${id}`, {
-            method: 'PUT', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify(data)
-        });
-        return await r.json();
+    getAll(table) {
+        let data = this._getTable(table);
+        // 카테고리 테이블에 데이터가 없으면 기본값 세팅
+        if (!data && table === 'categories') {
+            data = [...DEFAULT_CATEGORIES];
+            this._setTable(table, data);
+        }
+        return data || [];
     },
-    async patch(table, id, data) {
-        const r = await fetch(`tables/${table}/${id}`, {
-            method: 'PATCH', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify(data)
-        });
-        return await r.json();
+    create(table, row) {
+        const data = this.getAll(table);
+        if (!row.id) row.id = Utils.uuid();
+        row.created_at = Date.now();
+        row.updated_at = Date.now();
+        data.push(row);
+        this._setTable(table, data);
+        return row;
     },
-    async remove(table, id) {
-        await fetch(`tables/${table}/${id}`, { method: 'DELETE' });
+    update(table, id, newRow) {
+        const data = this.getAll(table);
+        const idx = data.findIndex(r => r.id === id);
+        if (idx === -1) return null;
+        newRow.id = id;
+        newRow.updated_at = Date.now();
+        newRow.created_at = data[idx].created_at || Date.now();
+        data[idx] = newRow;
+        this._setTable(table, data);
+        return newRow;
+    },
+    patch(table, id, partial) {
+        const data = this.getAll(table);
+        const idx = data.findIndex(r => r.id === id);
+        if (idx === -1) return null;
+        Object.assign(data[idx], partial, { updated_at: Date.now() });
+        this._setTable(table, data);
+        return data[idx];
+    },
+    remove(table, id) {
+        const data = this.getAll(table);
+        const idx = data.findIndex(r => r.id === id);
+        if (idx !== -1) {
+            data[idx].deleted = true;
+            data[idx].updated_at = Date.now();
+            this._setTable(table, data);
+        }
+    },
+    clearTable(table) {
+        localStorage.removeItem(`smartbook_${table}`);
+    },
+    exportAll() {
+        return {
+            categories: this.getAll('categories'),
+            transactions: this.getAll('transactions'),
+            budgets: this.getAll('budgets'),
+            recurring: this.getAll('recurring')
+        };
+    },
+    importAll(backup) {
+        if (backup.categories) this._setTable('categories', backup.categories);
+        if (backup.transactions) this._setTable('transactions', backup.transactions);
+        if (backup.budgets) this._setTable('budgets', backup.budgets);
+        if (backup.recurring) this._setTable('recurring', backup.recurring);
     }
+};
+
+// ===== Backward-compatible API (wraps Store) =====
+const API = {
+    async get(table)            { return Store.getAll(table); },
+    async create(table, data)   { return Store.create(table, data); },
+    async update(table, id, d)  { return Store.update(table, id, d); },
+    async patch(table, id, d)   { return Store.patch(table, id, d); },
+    async remove(table, id)     { return Store.remove(table, id); }
 };
 
 // ===== Data Loading =====
 async function loadAllData() {
     try {
-        const [cats, txs, budgets, recurring] = await Promise.all([
-            API.get('categories'),
-            API.get('transactions'),
-            API.get('budgets'),
-            API.get('recurring')
-        ]);
-        APP.categories = (Array.isArray(cats) ? cats : []).filter(c => !c.deleted);
-        APP.transactions = (Array.isArray(txs) ? txs : []).filter(t => !t.deleted);
-        APP.budgets = (Array.isArray(budgets) ? budgets : []).filter(b => !b.deleted);
-        APP.recurring = (Array.isArray(recurring) ? recurring : []).filter(r => !r.deleted);
+        const cats      = await API.get('categories');
+        const txs       = await API.get('transactions');
+        const budgets   = await API.get('budgets');
+        const recurring = await API.get('recurring');
+
+        APP.categories  = cats.filter(c => !c.deleted);
+        APP.transactions = txs.filter(t => !t.deleted);
+        APP.budgets     = budgets.filter(b => !b.deleted);
+        APP.recurring   = recurring.filter(r => !r.deleted);
     } catch(e) {
         console.error('Data load error:', e);
     }
@@ -1667,13 +1730,11 @@ async function importData(rows) {
 }
 
 async function downloadBackup() {
+    const allData = Store.exportAll();
     const backup = {
         version: '1.0',
         date: new Date().toISOString(),
-        categories: APP.categories,
-        transactions: APP.transactions,
-        budgets: APP.budgets,
-        recurring: APP.recurring
+        ...allData
     };
 
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
@@ -1712,18 +1773,7 @@ async function handleRestoreFile(file) {
 
             document.getElementById('confirmRestore').onclick = async () => {
                 try {
-                    for (const tx of backup.transactions) {
-                        await API.create('transactions', { ...tx, id: undefined });
-                    }
-                    for (const cat of (backup.categories || []).filter(c => !c.is_default)) {
-                        await API.create('categories', { ...cat, id: undefined });
-                    }
-                    for (const b of (backup.budgets || [])) {
-                        await API.create('budgets', { ...b, id: undefined });
-                    }
-                    for (const r of (backup.recurring || [])) {
-                        await API.create('recurring', { ...r, id: undefined });
-                    }
+                    Store.importAll(backup);
                     await loadAllData();
                     closeModal();
                     showToast('데이터가 복원되었습니다.', 'success');
