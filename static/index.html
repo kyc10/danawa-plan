@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>가계부 대시보드</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+  <style>
+    /* ===== CSS VARIABLES ===== */
+    :root[data-theme="light"] {
+      --bg-primary: #f0f4f8;
+      --bg-card: #ffffff;
+      --bg-card2: #f8fafc;
+      --text-primary: #1e293b;
+      --text-secondary: #64748b;
+      --text-muted: #94a3b8;
+      --border: #e2e8f0;
+      --accent: #6366f1;
+      --accent-light: #eef2ff;
+      --accent2: #10b981;
+      --accent2-light: #ecfdf5;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04);
+      --shadow-lg: 0 8px 32px rgba(0,0,0,0.10);
+      --toggle-bg: #e2e8f0;
+      --toggle-circle: #ffffff;
+      --scrollbar-track: #f1f5f9;
+      --scrollbar-thumb: #cbd5e1;
+      --upload-bg: #f8fafc;
+      --upload-border: #cbd5e1;
+      --tag-bg: #eef2ff;
+      --tag-text: #4f46e5;
+      --insight-bg: #fffbeb;
+      --insight-border: #fde68a;
+      --insight-icon: #f59e0b;
+      --positive: #10b981;
+      --negative: #ef4444;
+    }
+    :root[data-theme="dark"] {
+      --bg-primary: #0f172a;
+      --bg-card: #1e293b;
+      --bg-card2: #162032;
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --border: #334155;
+      --accent: #818cf8;
+      --accent-light: #1e1b4b;
+      --accent2: #34d399;
+      --accent2-light: #064e3b;
+      --danger: #f87171;
+      --warning: #fbbf24;
+      --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.2);
+      --shadow-lg: 0 8px 32px rgba(0,0,0,0.4);
+      --toggle-bg: #334155;
+      --toggle-circle: #f1f5f9;
+      --scrollbar-track: #1e293b;
+      --scrollbar-thumb: #475569;
+      --upload-bg: #162032;
+      --upload-border: #475569;
+      --tag-bg: #1e1b4b;
+      --tag-text: #a5b4fc;
+      --insight-bg: #1c1500;
+      --insight-border: #713f12;
+      --insight-icon: #fbbf24;
+      --positive: #34d399;
+      --negative: #f87171;
+    }
+
+    /* ===== RESET & BASE ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 15px; }
+    body {
+      font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      transition: background 0.3s, color 0.3s;
+      min-height: 100vh;
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+    ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+
+    /* ===== HEADER ===== */
+    .header {
+      position: sticky; top: 0; z-index: 100;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 0 28px;
+      height: 62px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .logo { width: 34px; height: 34px; background: var(--accent); border-radius: 10px;
+      display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .header-title { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); }
+    .header-title span { color: var(--accent); }
+    .header-right { display: flex; align-items: center; gap: 14px; }
+    .last-updated { font-size: 0.75rem; color: var(--text-muted); }
+    .theme-toggle {
+      position: relative; width: 46px; height: 26px;
+      background: var(--toggle-bg); border-radius: 13px;
+      cursor: pointer; transition: background 0.3s;
+      border: none; flex-shrink: 0;
+    }
+    .theme-toggle::after {
+      content: ''; position: absolute; top: 3px; left: 3px;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: var(--toggle-circle);
+      transition: transform 0.3s, background 0.3s;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    }
+    [data-theme="dark"] .theme-toggle::after { transform: translateX(20px); }
+    .theme-icon { font-size: 13px; }
+
+    /* ===== MAIN LAYOUT ===== */
+    .main { max-width: 1440px; margin: 0 auto; padding: 24px 24px 40px; }
+
+    /* ===== CONTROL BAR ===== */
+    .control-bar {
+      display: flex; align-items: center; gap: 12px;
+      flex-wrap: wrap; margin-bottom: 22px;
+    }
+    .control-label { font-size: 0.82rem; color: var(--text-secondary); font-weight: 500; }
+    .year-btn {
+      padding: 6px 16px; border-radius: 20px; font-size: 0.82rem; font-weight: 600;
+      border: 1.5px solid var(--border); background: var(--bg-card);
+      color: var(--text-secondary); cursor: pointer; transition: all 0.2s;
+    }
+    .year-btn.active, .year-btn:hover {
+      background: var(--accent); color: #fff; border-color: var(--accent);
+    }
+    .sep { width: 1px; height: 20px; background: var(--border); }
+
+    /* ===== KPI CARDS ===== */
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 22px; }
+    @media (max-width: 900px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 500px) { .kpi-grid { grid-template-columns: 1fr; } }
+    .kpi-card {
+      background: var(--bg-card); border-radius: 14px; padding: 20px 20px 16px;
+      box-shadow: var(--shadow); border: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .kpi-label { font-size: 0.75rem; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: .05em; }
+    .kpi-value { font-size: 1.55rem; font-weight: 800; color: var(--text-primary); line-height: 1; }
+    .kpi-value.red { color: var(--danger); }
+    .kpi-value.green { color: var(--accent2); }
+    .kpi-sub { font-size: 0.75rem; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; margin-top: 2px; }
+    .badge { display: inline-flex; align-items: center; gap: 2px; padding: 2px 7px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; }
+    .badge.up { background: #fee2e2; color: #dc2626; }
+    .badge.down { background: #dcfce7; color: #16a34a; }
+    [data-theme="dark"] .badge.up { background: #450a0a; color: #fca5a5; }
+    [data-theme="dark"] .badge.down { background: #052e16; color: #86efac; }
+
+    /* ===== CHART SECTION ===== */
+    .section-title {
+      font-size: 0.95rem; font-weight: 700; color: var(--text-primary);
+      margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+    }
+    .section-title .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+    .chart-row { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 20px; }
+    @media (max-width: 900px) { .chart-row { grid-template-columns: 1fr; } }
+    .chart-card {
+      background: var(--bg-card); border-radius: 14px; padding: 20px;
+      box-shadow: var(--shadow); border: 1px solid var(--border);
+    }
+    .chart-card.full { grid-column: 1 / -1; }
+    .chart-wrap { position: relative; }
+    .chart-wrap canvas { max-height: 280px; }
+
+    /* ===== CATEGORY TREND ===== */
+    .cat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+    @media (max-width: 1100px) { .cat-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 650px) { .cat-grid { grid-template-columns: 1fr; } }
+    .cat-card {
+      background: var(--bg-card); border-radius: 14px; padding: 16px 16px 12px;
+      box-shadow: var(--shadow); border: 1px solid var(--border);
+    }
+    .cat-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .cat-name { font-size: 0.88rem; font-weight: 700; color: var(--text-primary); }
+    .cat-total { font-size: 0.75rem; color: var(--text-muted); }
+    .mini-chart { height: 68px; }
+
+    /* ===== TABLE ===== */
+    .table-card {
+      background: var(--bg-card); border-radius: 14px; padding: 20px;
+      box-shadow: var(--shadow); border: 1px solid var(--border); margin-bottom: 20px;
+    }
+    .table-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
+    .search-wrap { position: relative; }
+    .search-input {
+      padding: 7px 14px 7px 34px; border-radius: 20px;
+      border: 1.5px solid var(--border); background: var(--bg-card2);
+      color: var(--text-primary); font-size: 0.82rem; outline: none;
+      transition: border-color 0.2s; width: 200px;
+    }
+    .search-input:focus { border-color: var(--accent); }
+    .search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px; }
+    .month-select {
+      padding: 7px 14px; border-radius: 20px;
+      border: 1.5px solid var(--border); background: var(--bg-card2);
+      color: var(--text-primary); font-size: 0.82rem; outline: none; cursor: pointer;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+    th { text-align: left; padding: 8px 12px; color: var(--text-muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1.5px solid var(--border); }
+    td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text-secondary); }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--bg-card2); }
+    .cat-tag { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600; background: var(--tag-bg); color: var(--tag-text); }
+    .amount-cell { font-weight: 700; color: var(--text-primary); }
+    .amount-neg { color: var(--positive); }
+    .page-btn { padding: 5px 12px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--bg-card); color: var(--text-secondary); font-size: 0.78rem; cursor: pointer; transition: all 0.2s; }
+    .page-btn:hover, .page-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .pagination { display: flex; gap: 6px; align-items: center; margin-top: 12px; justify-content: flex-end; }
+
+    /* ===== INSIGHTS ===== */
+    .insights-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-bottom: 20px; }
+    .insight-card {
+      background: var(--insight-bg); border-radius: 12px; padding: 16px;
+      border: 1px solid var(--insight-border); display: flex; gap: 12px; align-items: flex-start;
+    }
+    .insight-icon { font-size: 1.4rem; flex-shrink: 0; }
+    .insight-title { font-size: 0.84rem; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
+    .insight-desc { font-size: 0.78rem; color: var(--text-secondary); line-height: 1.5; }
+
+    /* ===== UPLOAD ===== */
+    .upload-card {
+      background: var(--bg-card); border-radius: 14px; padding: 20px;
+      box-shadow: var(--shadow); border: 1px solid var(--border); margin-bottom: 20px;
+    }
+    .upload-zone {
+      border: 2px dashed var(--upload-border); border-radius: 10px;
+      padding: 32px 20px; text-align: center; cursor: pointer;
+      background: var(--upload-bg); transition: all 0.2s;
+    }
+    .upload-zone:hover, .upload-zone.drag-over { border-color: var(--accent); background: var(--accent-light); }
+    .upload-icon { font-size: 2.2rem; margin-bottom: 8px; }
+    .upload-text { font-size: 0.85rem; color: var(--text-secondary); }
+    .upload-text strong { color: var(--accent); }
+    .upload-btn {
+      margin-top: 12px; padding: 9px 24px; border-radius: 20px;
+      background: var(--accent); color: #fff; border: none; cursor: pointer;
+      font-size: 0.85rem; font-weight: 600; transition: opacity 0.2s;
+    }
+    .upload-btn:hover { opacity: 0.88; }
+    .upload-status { margin-top: 10px; font-size: 0.8rem; padding: 8px 14px; border-radius: 8px; }
+    .upload-status.success { background: var(--accent2-light); color: var(--accent2); }
+    .upload-status.error { background: #fee2e2; color: #dc2626; }
+    [data-theme="dark"] .upload-status.error { background: #450a0a; color: #fca5a5; }
+
+    /* ===== LOADING ===== */
+    .loading-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.35);
+      display: flex; align-items: center; justify-content: center; z-index: 9999;
+    }
+    .loading-spinner { width: 44px; height: 44px; border: 4px solid rgba(255,255,255,0.2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .hidden { display: none !important; }
+
+    /* ===== TABS ===== */
+    .tabs { display: flex; gap: 4px; background: var(--bg-card2); border-radius: 10px; padding: 4px; margin-bottom: 20px; width: fit-content; }
+    .tab-btn { padding: 7px 18px; border-radius: 8px; border: none; cursor: pointer; font-size: 0.83rem; font-weight: 600; color: var(--text-muted); background: transparent; transition: all 0.2s; }
+    .tab-btn.active { background: var(--bg-card); color: var(--accent); box-shadow: var(--shadow); }
+
+    /* ===== HEATMAP ===== */
+    .heatmap-grid { display: grid; gap: 6px; }
+    .heatmap-row { display: flex; gap: 4px; align-items: center; }
+    .heatmap-label { font-size: 0.72rem; color: var(--text-muted); width: 54px; text-align: right; flex-shrink: 0; }
+    .heatmap-cell { height: 28px; flex: 1; border-radius: 4px; transition: opacity 0.2s; cursor: default; position: relative; }
+    .heatmap-cell:hover::after {
+      content: attr(data-tip);
+      position: absolute; bottom: 120%; left: 50%; transform: translateX(-50%);
+      background: var(--bg-primary); color: var(--text-primary);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 4px 8px; font-size: 0.72rem; white-space: nowrap; z-index: 10;
+      box-shadow: var(--shadow);
+    }
+    .heatmap-months { display: flex; gap: 4px; padding-left: 58px; margin-bottom: 2px; }
+    .heatmap-month-label { flex: 1; font-size: 0.7rem; color: var(--text-muted); text-align: center; }
+
+    /* Scrollable cat table */
+    .overflow-scroll { overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <div id="loading" class="loading-overlay">
+    <div class="loading-spinner"></div>
+  </div>
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-left">
+      <div class="logo">💰</div>
+      <div class="header-title">가계부 <span>대시보드</span></div>
+    </div>
+    <div class="header-right">
+      <span class="last-updated" id="lastUpdated"></span>
+      <span class="theme-icon" id="themeIcon">🌙</span>
+      <button class="theme-toggle" id="themeToggle" title="라이트/다크 모드 전환"></button>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- UPLOAD SECTION -->
+    <div class="upload-card">
+      <div class="section-title"><span class="dot"></span>엑셀 파일 업로드</div>
+      <div class="upload-zone" id="uploadZone">
+        <div class="upload-icon">📂</div>
+        <div class="upload-text"><strong>클릭</strong>하거나 파일을 여기에 끌어다 놓으세요</div>
+        <div class="upload-text" style="margin-top:4px; font-size:0.76rem">같은 형식의 .xlsx 파일 업로드 시 해당 월 데이터가 자동 반영됩니다</div>
+        <input type="file" id="fileInput" accept=".xlsx" style="display:none" />
+        <button class="upload-btn" id="uploadBtn">파일 선택</button>
+      </div>
+      <div id="uploadStatus" class="upload-status hidden"></div>
+    </div>
+
+    <!-- YEAR FILTER -->
+    <div class="control-bar">
+      <span class="control-label">연도 필터</span>
+      <div id="yearBtns"></div>
+    </div>
+
+    <!-- KPI CARDS -->
+    <div class="kpi-grid" id="kpiGrid">
+      <div class="kpi-card"><div class="kpi-label">총 지출 (선택기간)</div><div class="kpi-value" id="kpiTotal">-</div><div class="kpi-sub" id="kpiTotalSub"></div></div>
+      <div class="kpi-card"><div class="kpi-label">월 평균 지출</div><div class="kpi-value" id="kpiAvg">-</div><div class="kpi-sub" id="kpiAvgSub"></div></div>
+      <div class="kpi-card"><div class="kpi-label">최고 지출 월</div><div class="kpi-value red" id="kpiMax">-</div><div class="kpi-sub" id="kpiMaxSub"></div></div>
+      <div class="kpi-card"><div class="kpi-label">최저 지출 월</div><div class="kpi-value green" id="kpiMin">-</div><div class="kpi-sub" id="kpiMinSub"></div></div>
+    </div>
+
+    <!-- MAIN CHARTS -->
+    <div class="chart-row">
+      <div class="chart-card">
+        <div class="section-title"><span class="dot"></span>전체 월별 지출 추이</div>
+        <div class="chart-wrap"><canvas id="totalTrendChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="section-title"><span class="dot" style="background:var(--accent2)"></span>항목별 비중 (선택기간)</div>
+        <div class="chart-wrap"><canvas id="categoryPieChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- STACKED BAR -->
+    <div class="chart-card" style="margin-bottom:20px">
+      <div class="section-title"><span class="dot" style="background:#f59e0b"></span>항목별 월 소비 분포</div>
+      <div class="chart-wrap"><canvas id="stackedBarChart" style="max-height:320px"></canvas></div>
+    </div>
+
+    <!-- TABS for Category Trends -->
+    <div class="section-title"><span class="dot" style="background:#ec4899"></span>항목별 월 소비 추이</div>
+    <div class="tabs" id="categoryTabs"></div>
+    <div class="chart-card" style="margin-bottom:20px">
+      <div class="chart-wrap"><canvas id="categoryLineChart" style="max-height:280px"></canvas></div>
+    </div>
+
+    <!-- HEATMAP -->
+    <div class="chart-card" style="margin-bottom:20px">
+      <div class="section-title"><span class="dot" style="background:#8b5cf6"></span>카테고리별 지출 히트맵</div>
+      <div id="heatmapContainer"></div>
+    </div>
+
+    <!-- INSIGHTS -->
+    <div class="section-title"><span class="dot" style="background:#f59e0b"></span>지출 분석 인사이트 & 절감 제안</div>
+    <div class="insights-grid" id="insightsGrid"></div>
+
+    <!-- TRANSACTION TABLE -->
+    <div class="table-card">
+      <div class="table-header">
+        <div class="section-title" style="margin-bottom:0"><span class="dot" style="background:#06b6d4"></span>거래 내역</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <select class="month-select" id="txMonthSelect"></select>
+          <select class="month-select" id="txCatSelect"></select>
+          <div class="search-wrap">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="search-input" id="txSearch" placeholder="내역 검색..." />
+          </div>
+        </div>
+      </div>
+      <div class="overflow-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>날짜</th>
+              <th>내역</th>
+              <th>카테고리</th>
+              <th style="text-align:right">금액</th>
+            </tr>
+          </thead>
+          <tbody id="txTableBody"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="pagination"></div>
+    </div>
+
+  </main>
+
+  <script>
+  // ==================== GLOBALS ====================
+  let allData = {};
+  let filteredMonths = [];
+  let selectedYear = 'all';
+  let selectedCategories = [];
+  let txPage = 1;
+  const TX_PER_PAGE = 15;
+  let charts = {};
+
+  const CATEGORIES = ['식료품','꾸밈비','외식비','문화비','의료비','공과금','교육비',
+    '교통비','보험료','차량비용','여행경비','대출이자','경조사비','생필품','기타'];
+
+  const CAT_COLORS = [
+    '#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6',
+    '#06b6d4','#ec4899','#84cc16','#f97316','#14b8a6',
+    '#a78bfa','#fb7185','#facc15','#34d399','#94a3b8'
+  ];
+
+  const CAT_ICONS = {
+    '식료품':'🛒','꾸밈비':'👗','외식비':'🍽️','문화비':'🎭','의료비':'🏥',
+    '공과금':'⚡','교육비':'📚','교통비':'🚗','보험료':'🛡️','차량비용':'🔧',
+    '여행경비':'✈️','대출이자':'🏦','경조사비':'🎁','생필품':'🏠','기타':'📦'
+  };
+
+  // ==================== THEME ====================
+  const themeToggle = document.getElementById('themeToggle');
+  const themeIcon = document.getElementById('themeIcon');
+  const html = document.documentElement;
+
+  function setTheme(t) {
+    html.setAttribute('data-theme', t);
+    themeIcon.textContent = t === 'dark' ? '☀️' : '🌙';
+    localStorage.setItem('theme', t);
+    if (Object.keys(charts).length) updateAllCharts();
+  }
+  themeToggle.addEventListener('click', () => {
+    setTheme(html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  });
+  setTheme(localStorage.getItem('theme') || 'light');
+
+  // ==================== UTILS ====================
+  function fmt(n) {
+    if (n === undefined || n === null) return '-';
+    return Math.round(n).toLocaleString('ko-KR') + '원';
+  }
+  function fmtShort(n) {
+    if (n >= 100000000) return (n/100000000).toFixed(1) + '억';
+    if (n >= 10000) return (n/10000).toFixed(0) + '만';
+    return n.toLocaleString();
+  }
+  function getCSSVar(name) {
+    return getComputedStyle(html).getPropertyValue(name).trim();
+  }
+  function hexToRgba(hex, alpha) {
+    const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+  function monthLabel(m) {
+    const [y, mo] = m.split('-');
+    return `${y.slice(2)}년 ${parseInt(mo)}월`;
+  }
+  function shortMonthLabel(m) {
+    const [y, mo] = m.split('-');
+    return `${y.slice(2)}/${mo}`;
+  }
+
+  // ==================== DATA LOAD ====================
+  async function loadData() {
+    const res = await fetch('/api/data');
+    allData = await res.json();
+    document.getElementById('lastUpdated').textContent = `업데이트: ${new Date().toLocaleDateString('ko-KR')}`;
+    initYearBtns();
+    applyFilter();
+    document.getElementById('loading').classList.add('hidden');
+  }
+
+  // ==================== YEAR FILTER ====================
+  function initYearBtns() {
+    const years = [...new Set(Object.keys(allData).map(m => m.split('-')[0]))].sort();
+    const container = document.getElementById('yearBtns');
+    container.innerHTML = '';
+    const allBtn = document.createElement('button');
+    allBtn.className = 'year-btn ' + (selectedYear === 'all' ? 'active' : '');
+    allBtn.textContent = '전체';
+    allBtn.style.marginRight = '6px';
+    allBtn.addEventListener('click', () => { selectedYear = 'all'; applyFilter(); updateYearBtns(); });
+    container.appendChild(allBtn);
+    years.forEach(y => {
+      const btn = document.createElement('button');
+      btn.className = 'year-btn ' + (selectedYear === y ? 'active' : '');
+      btn.textContent = y + '년';
+      btn.style.marginRight = '6px';
+      btn.addEventListener('click', () => { selectedYear = y; applyFilter(); updateYearBtns(); });
+      container.appendChild(btn);
+    });
+  }
+  function updateYearBtns() {
+    document.querySelectorAll('.year-btn').forEach(btn => {
+      const t = btn.textContent.replace('년','');
+      btn.classList.toggle('active', t === selectedYear || (t === '전체' && selectedYear === 'all'));
+    });
+  }
+
+  function applyFilter() {
+    const months = Object.keys(allData).sort();
+    filteredMonths = selectedYear === 'all' ? months : months.filter(m => m.startsWith(selectedYear));
+    updateKPI();
+    updateAllCharts();
+    updateHeatmap();
+    updateInsights();
+    updateTxFilter();
+  }
+
+  // ==================== KPI ====================
+  function updateKPI() {
+    const totals = filteredMonths.map(m => {
+      const cats = allData[m]?.categories || {};
+      return Object.values(cats).reduce((a,b) => a+b, 0);
+    });
+    const total = totals.reduce((a,b) => a+b, 0);
+    const avg = totals.length ? total / totals.length : 0;
+    const maxIdx = totals.indexOf(Math.max(...totals));
+    const minIdx = totals.indexOf(Math.min(...totals.filter(t => t > 0)));
+
+    document.getElementById('kpiTotal').textContent = fmt(total);
+    document.getElementById('kpiAvg').textContent = fmt(avg);
+    document.getElementById('kpiMax').textContent = fmt(totals[maxIdx] || 0);
+    document.getElementById('kpiMin').textContent = fmt(totals[minIdx] >= 0 ? totals[minIdx] : 0);
+
+    document.getElementById('kpiTotalSub').textContent = `${filteredMonths.length}개월`;
+    document.getElementById('kpiAvgSub').textContent = '월 평균';
+    document.getElementById('kpiMaxSub').textContent = filteredMonths[maxIdx] ? monthLabel(filteredMonths[maxIdx]) : '';
+    document.getElementById('kpiMinSub').textContent = filteredMonths[minIdx] >= 0 ? monthLabel(filteredMonths[minIdx] || filteredMonths[0]) : '';
+
+    // MoM change badge
+    if (totals.length >= 2) {
+      const last = totals[totals.length-1], prev = totals[totals.length-2];
+      const pct = prev > 0 ? ((last-prev)/prev*100).toFixed(1) : 0;
+      const isUp = last > prev;
+      document.getElementById('kpiAvgSub').innerHTML = `<span class="badge ${isUp?'up':'down'}">${isUp?'▲':'▼'} ${Math.abs(pct)}%</span> 전월 대비`;
+    }
+  }
+
+  // ==================== CHARTS ====================
+  function chartDefaults() {
+    const isDark = html.getAttribute('data-theme') === 'dark';
+    return {
+      color: getCSSVar('--text-secondary'),
+      gridColor: getCSSVar('--border'),
+      isDark
+    };
+  }
+
+  function destroyChart(key) {
+    if (charts[key]) { charts[key].destroy(); delete charts[key]; }
+  }
+
+  function updateAllCharts() {
+    renderTotalTrendChart();
+    renderCategoryPieChart();
+    renderStackedBarChart();
+    renderCategoryLineChart();
+  }
+
+  // --- Total Trend Line ---
+  function renderTotalTrendChart() {
+    destroyChart('totalTrend');
+    const ctx = document.getElementById('totalTrendChart').getContext('2d');
+    const { color, gridColor } = chartDefaults();
+    const labels = filteredMonths.map(shortMonthLabel);
+    const data = filteredMonths.map(m => {
+      const cats = allData[m]?.categories || {};
+      return Object.values(cats).reduce((a,b) => a+b, 0);
+    });
+    const avg = data.reduce((a,b) => a+b,0) / (data.length||1);
+
+    charts['totalTrend'] = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: '월별 총 지출',
+            data,
+            borderColor: '#6366f1',
+            backgroundColor: hexToRgba('#6366f1', 0.12),
+            pointBackgroundColor: '#6366f1',
+            pointRadius: 5,
+            pointHoverRadius: 7,
+            fill: true,
+            tension: 0.4,
+            borderWidth: 2.5,
+          },
+          {
+            label: '평균',
+            data: data.map(() => avg),
+            borderColor: '#f59e0b',
+            borderDash: [6,4],
+            borderWidth: 1.5,
+            pointRadius: 0,
+            fill: false,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: { display: true, labels: { color, font: { size: 11 } } },
+          tooltip: {
+            callbacks: {
+              label: ctx => ' ' + fmt(ctx.parsed.y)
+            }
+          },
+          datalabels: { display: false }
+        },
+        scales: {
+          x: { ticks: { color, font: { size: 11 } }, grid: { color: gridColor } },
+          y: {
+            ticks: { color, font: { size: 11 }, callback: v => fmtShort(v) + '원' },
+            grid: { color: gridColor }
+          }
+        }
+      }
+    });
+  }
+
+  // --- Pie Chart ---
+  function renderCategoryPieChart() {
+    destroyChart('categoryPie');
+    const ctx = document.getElementById('categoryPieChart').getContext('2d');
+    const { color } = chartDefaults();
+    const catTotals = {};
+    CATEGORIES.forEach(c => { catTotals[c] = 0; });
+    filteredMonths.forEach(m => {
+      const cats = allData[m]?.categories || {};
+      CATEGORIES.forEach(c => { catTotals[c] += (cats[c] || 0); });
+    });
+    const labels = CATEGORIES.filter(c => catTotals[c] > 0);
+    const data = labels.map(c => catTotals[c]);
+    const total = data.reduce((a,b) => a+b, 0);
+
+    charts['categoryPie'] = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels,
+        datasets: [{
+          data,
+          backgroundColor: labels.map((_, i) => CAT_COLORS[CATEGORIES.indexOf(labels[i]) % CAT_COLORS.length]),
+          borderWidth: 2,
+          borderColor: getCSSVar('--bg-card'),
+          hoverOffset: 8
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        cutout: '60%',
+        plugins: {
+          legend: { position: 'right', labels: { color, font: { size: 10 }, boxWidth: 12, padding: 8 } },
+          tooltip: {
+            callbacks: {
+              label: ctx => {
+                const pct = (ctx.parsed / total * 100).toFixed(1);
+                return ` ${ctx.label}: ${fmt(ctx.parsed)} (${pct}%)`;
+              }
+            }
+          },
+          datalabels: { display: false }
+        }
+      }
+    });
+  }
+
+  // --- Stacked Bar ---
+  function renderStackedBarChart() {
+    destroyChart('stackedBar');
+    const ctx = document.getElementById('stackedBarChart').getContext('2d');
+    const { color, gridColor } = chartDefaults();
+    const labels = filteredMonths.map(shortMonthLabel);
+    const activeCats = CATEGORIES.filter(c => {
+      return filteredMonths.some(m => (allData[m]?.categories?.[c] || 0) > 0);
+    });
+
+    charts['stackedBar'] = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: activeCats.map((cat, i) => ({
+          label: cat,
+          data: filteredMonths.map(m => allData[m]?.categories?.[cat] || 0),
+          backgroundColor: hexToRgba(CAT_COLORS[CATEGORIES.indexOf(cat) % CAT_COLORS.length], 0.85),
+          borderRadius: 2,
+          borderSkipped: false,
+        }))
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: { labels: { color, font: { size: 10 }, boxWidth: 12, padding: 6 } },
+          tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmt(ctx.parsed.y)}` } },
+          datalabels: { display: false }
+        },
+        scales: {
+          x: { stacked: true, ticks: { color, font: { size: 10 } }, grid: { display: false } },
+          y: { stacked: true, ticks: { color, font: { size: 10 }, callback: v => fmtShort(v) }, grid: { color: gridColor } }
+        }
+      }
+    });
+  }
+
+  // --- Category Line (tabs) ---
+  let activeCatTab = CATEGORIES[0];
+  function renderCategoryTabs() {
+    const tabs = document.getElementById('categoryTabs');
+    tabs.innerHTML = '';
+    CATEGORIES.forEach(cat => {
+      const btn = document.createElement('button');
+      btn.className = 'tab-btn' + (cat === activeCatTab ? ' active' : '');
+      btn.textContent = (CAT_ICONS[cat] || '') + ' ' + cat;
+      btn.addEventListener('click', () => {
+        activeCatTab = cat;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderCategoryLineChart();
+      });
+      tabs.appendChild(btn);
+    });
+  }
+  function renderCategoryLineChart() {
+    destroyChart('categoryLine');
+    const ctx = document.getElementById('categoryLineChart').getContext('2d');
+    const { color, gridColor } = chartDefaults();
+    const labels = filteredMonths.map(shortMonthLabel);
+    const data = filteredMonths.map(m => allData[m]?.categories?.[activeCatTab] || 0);
+    const color1 = CAT_COLORS[CATEGORIES.indexOf(activeCatTab) % CAT_COLORS.length];
+    const avg = data.filter(v=>v>0).reduce((a,b)=>a+b,0) / (data.filter(v=>v>0).length || 1);
+
+    charts['categoryLine'] = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            type: 'bar',
+            label: activeCatTab,
+            data,
+            backgroundColor: data.map(v => v > avg*1.2 ? hexToRgba('#ef4444', 0.7) : hexToRgba(color1, 0.7)),
+            borderRadius: 6,
+            order: 2,
+          },
+          {
+            type: 'line',
+            label: '평균',
+            data: data.map(() => avg),
+            borderColor: '#f59e0b',
+            borderDash: [6,4],
+            borderWidth: 1.5,
+            pointRadius: 0,
+            fill: false,
+            order: 1,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: { labels: { color, font: { size: 11 } } },
+          tooltip: { callbacks: { label: ctx => ` ${fmt(ctx.parsed.y)}` } },
+          datalabels: { display: false }
+        },
+        scales: {
+          x: { ticks: { color, font: { size: 11 } }, grid: { display: false } },
+          y: { ticks: { color, font: { size: 11 }, callback: v => fmtShort(v) + '원' }, grid: { color: gridColor } }
+        }
+      }
+    });
+  }
+
+  // ==================== HEATMAP ====================
+  function updateHeatmap() {
+    const container = document.getElementById('heatmapContainer');
+    const months = filteredMonths;
+    if (!months.length) { container.innerHTML = '<p style="color:var(--text-muted);padding:12px">데이터 없음</p>'; return; }
+
+    // Build data
+    const catMaxes = {};
+    CATEGORIES.forEach(cat => {
+      const vals = months.map(m => allData[m]?.categories?.[cat] || 0);
+      catMaxes[cat] = Math.max(...vals, 1);
+    });
+
+    let html2 = '<div class="heatmap-grid">';
+    // Month labels
+    html2 += '<div class="heatmap-months">' + months.map(m => `<div class="heatmap-month-label">${shortMonthLabel(m)}</div>`).join('') + '</div>';
+    CATEGORIES.forEach(cat => {
+      const colorBase = CAT_COLORS[CATEGORIES.indexOf(cat) % CAT_COLORS.length];
+      html2 += `<div class="heatmap-row"><div class="heatmap-label">${CAT_ICONS[cat]||''} ${cat}</div>`;
+      months.forEach(m => {
+        const val = allData[m]?.categories?.[cat] || 0;
+        const intensity = val / catMaxes[cat];
+        const alpha = val > 0 ? Math.max(0.12, intensity * 0.9) : 0.06;
+        html2 += `<div class="heatmap-cell" style="background:${hexToRgba(colorBase, alpha)}" data-tip="${monthLabel(m)}: ${fmt(val)}"></div>`;
+      });
+      html2 += '</div>';
+    });
+    html2 += '</div>';
+    container.innerHTML = html2;
+  }
+
+  // ==================== INSIGHTS ====================
+  function updateInsights() {
+    const grid = document.getElementById('insightsGrid');
+    const insights = generateInsights();
+    grid.innerHTML = insights.map(i => `
+      <div class="insight-card">
+        <div class="insight-icon">${i.icon}</div>
+        <div>
+          <div class="insight-title">${i.title}</div>
+          <div class="insight-desc">${i.desc}</div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function generateInsights() {
+    const months = filteredMonths;
+    if (!months.length) return [];
+    const insights = [];
+
+    // Totals per month
+    const totals = months.map(m => ({ month: m, total: Object.values(allData[m]?.categories||{}).reduce((a,b)=>a+b,0) }));
+    const sortedTotals = [...totals].sort((a,b) => b.total - a.total);
+
+    // 1. Highest spending month
+    if (sortedTotals[0]) {
+      insights.push({
+        icon: '📈',
+        title: `최고 지출 월: ${monthLabel(sortedTotals[0].month)}`,
+        desc: `${fmt(sortedTotals[0].total)} 지출로 전체 중 가장 높습니다. 해당 월의 지출 내역을 검토해 보세요.`
+      });
+    }
+
+    // 2. Highest category
+    const catTotals = {};
+    CATEGORIES.forEach(c => { catTotals[c] = months.reduce((a,m) => a + (allData[m]?.categories?.[c]||0), 0); });
+    const topCat = Object.entries(catTotals).sort((a,b)=>b[1]-a[1])[0];
+    if (topCat) {
+      const pct = (topCat[1] / totals.reduce((a,b)=>a+b.total,0) * 100).toFixed(1);
+      insights.push({
+        icon: CAT_ICONS[topCat[0]] || '💡',
+        title: `주요 지출 항목: ${topCat[0]}`,
+        desc: `전체 지출의 ${pct}%를 차지합니다 (${fmt(topCat[1])}). 이 항목을 10% 줄이면 연간 ${fmt(topCat[1]*0.1)}을 절감할 수 있습니다.`
+      });
+    }
+
+    // 3. Loan interest
+    const loanTotal = catTotals['대출이자'] || 0;
+    if (loanTotal > 0) {
+      const loanPct = (loanTotal / totals.reduce((a,b)=>a+b.total,0) * 100).toFixed(1);
+      insights.push({
+        icon: '🏦',
+        title: '대출이자 비중 체크',
+        desc: `대출이자가 총 지출의 ${loanPct}%입니다. 조기 상환 또는 금리 재협상으로 이자 부담을 줄여보세요.`
+      });
+    }
+
+    // 4. Education
+    const eduTotal = catTotals['교육비'] || 0;
+    if (eduTotal > 0) {
+      insights.push({
+        icon: '📚',
+        title: '교육비 절감 방법',
+        desc: `월 평균 ${fmt(eduTotal/months.length)} 지출. 교육비 지원 제도(바우처, 세액공제)를 활용하면 실질 부담을 줄일 수 있습니다.`
+      });
+    }
+
+    // 5. Food trend
+    const foodData = months.map(m => allData[m]?.categories?.['식료품']||0);
+    const eatOutData = months.map(m => allData[m]?.categories?.['외식비']||0);
+    const foodAvg = foodData.reduce((a,b)=>a+b,0)/(foodData.length||1);
+    const eatAvg = eatOutData.reduce((a,b)=>a+b,0)/(eatOutData.length||1);
+    if (eatAvg > foodAvg) {
+      insights.push({
+        icon: '🍳',
+        title: '외식 vs 식료품 비율',
+        desc: `외식비(${fmt(eatAvg)}/월)가 식료품비(${fmt(foodAvg)}/월)보다 높습니다. 집밥을 늘리면 월 ${fmt((eatAvg-foodAvg)*0.3)} 이상 절감 가능합니다.`
+      });
+    }
+
+    // 6. MoM trend
+    if (totals.length >= 2) {
+      const last = totals[totals.length-1].total, prev = totals[totals.length-2].total;
+      const diff = last - prev;
+      const pct = prev > 0 ? (diff/prev*100).toFixed(1) : 0;
+      if (diff > 0) {
+        insights.push({ icon: '⚠️', title: '전월 대비 지출 증가', desc: `전월보다 ${fmt(Math.abs(diff))} (${Math.abs(pct)}%) 증가했습니다. 증가 항목을 확인하고 지출을 조정해 보세요.` });
+      } else {
+        insights.push({ icon: '✅', title: '전월 대비 지출 감소', desc: `전월보다 ${fmt(Math.abs(diff))} (${Math.abs(pct)}%) 절감했습니다! 꾸준한 절약 습관을 유지하세요.` });
+      }
+    }
+
+    // 7. Travel
+    const travelTotal = catTotals['여행경비'] || 0;
+    if (travelTotal > 0) {
+      insights.push({
+        icon: '✈️',
+        title: '여행경비 관리 팁',
+        desc: `여행 지출 ${fmt(travelTotal)}. 카드 할부보다 미리 적립해두는 여행 전용 통장을 만들면 이자 없이 여행을 즐길 수 있습니다.`
+      });
+    }
+
+    // 8. Savings suggestion
+    const monthlyAvg = totals.reduce((a,b)=>a+b.total,0)/(totals.length||1);
+    insights.push({
+      icon: '💎',
+      title: '절약 목표 설정 추천',
+      desc: `현재 월 평균 지출은 ${fmt(monthlyAvg)}입니다. 월 10% (${fmt(monthlyAvg*0.1)}) 절약 목표를 세우면 연간 ${fmt(monthlyAvg*0.1*12)}를 저축할 수 있습니다.`
+    });
+
+    return insights;
+  }
+
+  // ==================== TRANSACTION TABLE ====================
+  function updateTxFilter() {
+    const monthSel = document.getElementById('txMonthSelect');
+    const catSel = document.getElementById('txCatSelect');
+    monthSel.innerHTML = '<option value="">전체 월</option>' + filteredMonths.map(m => `<option value="${m}">${monthLabel(m)}</option>`).join('');
+    catSel.innerHTML = '<option value="">전체 카테고리</option>' + CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
+    renderTxTable();
+  }
+
+  function getAllTx() {
+    const months = filteredMonths;
+    const txMonthVal = document.getElementById('txMonthSelect')?.value || '';
+    const txCatVal = document.getElementById('txCatSelect')?.value || '';
+    const searchVal = (document.getElementById('txSearch')?.value || '').toLowerCase();
+    let txs = [];
+    const targetMonths = txMonthVal ? [txMonthVal] : months;
+    targetMonths.forEach(m => {
+      (allData[m]?.transactions || []).forEach(tx => {
+        txs.push({ ...tx, month: m });
+      });
+    });
+    if (txCatVal) txs = txs.filter(t => t.category === txCatVal);
+    if (searchVal) txs = txs.filter(t => t.name.toLowerCase().includes(searchVal));
+    txs = txs.filter(t => t.amount > 0 && t.name !== '-');
+    txs.sort((a,b) => (b.date||'').localeCompare(a.date||'') || b.amount - a.amount);
+    return txs;
+  }
+
+  function renderTxTable() {
+    const txs = getAllTx();
+    const total = txs.length;
+    const pages = Math.ceil(total / TX_PER_PAGE);
+    if (txPage > pages) txPage = 1;
+    const slice = txs.slice((txPage-1)*TX_PER_PAGE, txPage*TX_PER_PAGE);
+
+    const tbody = document.getElementById('txTableBody');
+    if (!slice.length) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:24px">거래 내역이 없습니다</td></tr>';
+    } else {
+      tbody.innerHTML = slice.map(tx => `
+        <tr>
+          <td style="color:var(--text-muted)">${tx.date || '-'}</td>
+          <td>${tx.name}</td>
+          <td><span class="cat-tag">${CAT_ICONS[tx.category]||''} ${tx.category}</span></td>
+          <td class="amount-cell${tx.amount < 0 ? ' amount-neg' : ''}" style="text-align:right">${fmt(Math.abs(tx.amount))}</td>
+        </tr>
+      `).join('');
+    }
+
+    // Pagination
+    const pg = document.getElementById('pagination');
+    if (pages <= 1) { pg.innerHTML = ''; return; }
+    let btns = '';
+    if (txPage > 1) btns += `<button class="page-btn" onclick="goPage(${txPage-1})">‹</button>`;
+    for (let p = Math.max(1, txPage-2); p <= Math.min(pages, txPage+2); p++) {
+      btns += `<button class="page-btn${p===txPage?' active':''}" onclick="goPage(${p})">${p}</button>`;
+    }
+    if (txPage < pages) btns += `<button class="page-btn" onclick="goPage(${txPage+1})">›</button>`;
+    pg.innerHTML = btns;
+  }
+
+  window.goPage = function(p) { txPage = p; renderTxTable(); };
+
+  // ==================== UPLOAD ====================
+  const uploadZone = document.getElementById('uploadZone');
+  const fileInput = document.getElementById('fileInput');
+  const uploadBtn = document.getElementById('uploadBtn');
+  const uploadStatus = document.getElementById('uploadStatus');
+
+  uploadBtn.addEventListener('click', () => fileInput.click());
+  uploadZone.addEventListener('click', e => { if (e.target !== uploadBtn) fileInput.click(); });
+  fileInput.addEventListener('change', () => { if (fileInput.files[0]) uploadFile(fileInput.files[0]); });
+
+  uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+  uploadZone.addEventListener('drop', e => {
+    e.preventDefault(); uploadZone.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f && f.name.endsWith('.xlsx')) uploadFile(f);
+  });
+
+  async function uploadFile(file) {
+    uploadStatus.className = 'upload-status';
+    uploadStatus.classList.remove('hidden');
+    uploadStatus.textContent = '⏳ 업로드 중...';
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const res = await fetch('/api/upload', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (data.success) {
+        uploadStatus.classList.add('success');
+        uploadStatus.textContent = `✅ 업로드 완료! ${data.months_added.join(', ')} 데이터가 반영되었습니다.`;
+        await loadData();
+      } else {
+        uploadStatus.classList.add('error');
+        uploadStatus.textContent = `❌ 오류: ${data.error}`;
+      }
+    } catch(e) {
+      uploadStatus.classList.add('error');
+      uploadStatus.textContent = `❌ 업로드 실패: ${e.message}`;
+    }
+  }
+
+  // ==================== EVENT LISTENERS ====================
+  document.getElementById('txMonthSelect').addEventListener('change', () => { txPage=1; renderTxTable(); });
+  document.getElementById('txCatSelect').addEventListener('change', () => { txPage=1; renderTxTable(); });
+  document.getElementById('txSearch').addEventListener('input', () => { txPage=1; renderTxTable(); });
+
+  // ==================== INIT ====================
+  Chart.register(ChartDataLabels);
+  renderCategoryTabs();
+  loadData();
+  </script>
+</body>
+</html>
